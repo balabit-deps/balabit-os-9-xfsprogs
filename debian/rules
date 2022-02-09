@@ -23,8 +23,14 @@ pkgdev = DIST_ROOT=`pwd`/$(dirdev); export DIST_ROOT;
 pkgdi  = DIST_ROOT=`pwd`/$(dirdi); export DIST_ROOT;
 stdenv = @GZIP=-q; export GZIP;
 
+ifeq ($(target),amd64)
+export DEB_CFLAGS_MAINT_APPEND=-fcf-protection
+export DEB_LDFLAGS_MAINT_APPEND=-fcf-protection
+endif
+include /usr/share/dpkg/default.mk
+
 options = export DEBUG=-DNDEBUG DISTRIBUTION=debian \
-	  INSTALL_USER=root INSTALL_GROUP=root \
+	  INSTALL_USER=root INSTALL_GROUP=root LDFLAGS='$(LDFLAGS)' \
 	  LOCAL_CONFIGURE_OPTIONS="--enable-editline=yes --enable-blkid=yes --disable-ubsan --disable-addrsan --disable-threadsan --enable-lto" ;
 diopts  = $(options) \
 	  export OPTIMIZER=-Os LOCAL_CONFIGURE_OPTIONS="--enable-gettext=no --disable-ubsan --disable-addrsan --disable-threadsan --enable-lto" ;
@@ -44,6 +50,7 @@ config: .census
 	$(checkdir)
 	AUTOHEADER=/bin/true dh_autoreconf
 	dh_update_autotools_config
+	cp include/install-sh install-sh
 	$(options) $(MAKE) $(PMAKEFLAGS) include/platform_defs.h
 	touch .census
 
@@ -82,7 +89,6 @@ binary-arch: checkroot built
 	$(pkgme)  $(MAKE) -C . install
 	$(pkgdev) $(MAKE) -C . install-dev
 	$(pkgdi)  $(MAKE) -C debian install-d-i
-	$(pkgme)  $(MAKE) dist
 	install -D -m 0755 debian/local/initramfs.hook debian/xfsprogs/usr/share/initramfs-tools/hooks/xfs
 	rmdir debian/xfslibs-dev/usr/share/doc/xfsprogs
 	rm -f debian/xfslibs-dev/lib/libhandle.la
