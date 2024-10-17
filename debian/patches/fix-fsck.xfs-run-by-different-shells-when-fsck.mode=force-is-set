@@ -1,0 +1,54 @@
+Description: fix fsck.xfs run by different shells when fsck.mode=force is set
+When fsck.mode=force is specified in the kernel command line, fsck.xfs
+is executed during the boot process. However, when the default shell is
+not bash, $PS1 should be a different value, consider the following script:
+cat ps1.sh
+echo "$PS1"
+
+run ps1.sh with different shells:
+ash ./ps1.sh
+$
+bash ./ps1.sh
+
+dash ./ps1.sh
+$
+ksh ./ps1.sh
+
+zsh ./ps1.sh
+
+On systems like Ubuntu, where dash is the default shell during the boot
+process to improve startup speed. This results in FORCE being incorrectly
+set to false and then xfs_repair is not invoked:
+if [ -n "$PS1" -o -t 0 ]; then
+        FORCE=false
+fi
+
+Other distros may encounter this issue too if the default shell is set
+to anoother shell.
+
+Check "-t 0" is enough to determine if we are in interactive mode, and
+xfs_repair is invoked as expected regardless of the shell used.
+
+Author: Gerald Yang <gerald.yang@canonical.com>
+Origin: upstream, https://git.kernel.org/pub/scm/fs/xfs/xfsprogs-dev.git/commit/?h=for-next&id=19dde7fac0f38af2990e367ef4dd8ec512920c12
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/2081163
+Reviewed-by: Darrick J. Wong <djwong@kernel.org>
+Last-Update: 2024-10-17
+
+--- xfsprogs-5.13.0.orig/fsck/xfs_fsck.sh
++++ xfsprogs-5.13.0/fsck/xfs_fsck.sh
+@@ -53,12 +53,12 @@ fi
+ # directly.
+ #
+ # Use multiple methods to capture most of the cases:
+-# The case for *i* and -n "$PS1" are commonly suggested in bash manual
++# The case for *i* is commonly suggested in bash manual
+ # and the -t 0 test checks stdin
+ case $- in
+ 	*i*) FORCE=false ;;
+ esac
+-if [ -n "$PS1" -o -t 0 ]; then
++if [ -t 0 ]; then
+ 	FORCE=false
+ fi
+ 
